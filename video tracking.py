@@ -1,27 +1,24 @@
 """
 TODO
--make "reset" test happen only every couple of seconds to save calculations
--make "reset" caibrate to new color
-
-
-
-
+-DONE-make "reset" test happen only every couple of seconds to save calculations
+-Done-make "reset" caibrate to new color
+-make function to tell servos to move 
+-make option to switch to face tracking
 
 
 
 """
 import numpy as np
 import cv2
-#from matplotlib import pyplot as plt
-#import os
 
-#os.chdir(os.path.dirname(os.path.abspath(__file__)))
+# How ofter will it check for 'reset'
+resetCounter = 5
 
-#Resolution
+# Resolution
 camWidth = 320
 camHeight = 240
 
-#Track box size
+# Track box size
 trackWidth = 100
 trackHeight = 80
 
@@ -47,7 +44,7 @@ def Calibrate_NewObject(cap):
     ret,frame = cap.read()
 
     # setup initial location of window
-    r,h,c,w = int(.5*(camHeight-trackHeight)), trackHeight, int(.5*(camWidth-trackWidth)), trackWidth  # Defined above. used int() to keep type integer
+    bottomLeftX, bottomLeftY = int(.5*(camHeight-trackHeight)), int(.5*(camWidth-trackWidth))  # Defined above. used int() to keep type integer
     track_window = (c,r,w,h)
 
     # set up the ROI for tracking
@@ -60,8 +57,7 @@ def Calibrate_NewObject(cap):
     
     return track_window, roi_hist
 
-
-
+# created a camera object and connects to webcam
 cap = cv2.VideoCapture(0)
 
 # take first frame of the video
@@ -84,22 +80,23 @@ cv2.normalize(roi_hist,roi_hist,0,255,cv2.NORM_MINMAX)
 res = cv2.bitwise_and(roi, roi, mask= mask)
 
 # Setup the termination criteria, either 10 iteration or move by atleast 1 pt
-term_crit = ( cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1 )
+term_crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1)
 
-while(1):
+while(True):
     ret ,frame = cap.read()
 
     if ret == True:
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         dst = cv2.calcBackProject([hsv],[0],roi_hist,[0,180],1)
         
-        #preShift = track_window
+        preShift = track_window
 
         # Apply meanshift to get the new location
         ret, track_window = cv2.meanShift(dst, track_window, term_crit)
         
-        # The change  X and Y 
-        #deltaPos = cv2.subtract((track_window[0],track_window[1]), (preShift[0], preShift[1]))
+        # The change  X and Y. posative isup and to the right
+        deltaPos = cv2.subtract((track_window[0],track_window[1]), (preShift[0], preShift[1]))
+        print deltaPos
   
         # Draw it on image
         x,y,w,h = track_window
@@ -113,7 +110,7 @@ while(1):
         if k == 27:
             #cv2.imwrite("ball.jpg",img2[50:130,50:150])
             #cv2.imwrite("ballInImage.jpg",dst)
-            #cv2.imwrite("face.jpg",img2)
+            #cv2.imwrite("me.jpg",img2)
             #cv2.imwrite("circleInImage.jpg",img2)
 
             break
@@ -121,11 +118,14 @@ while(1):
             cv2.imwrite(chr(k)+".jpg",img2)
             
         # Used as a 'reset' button to start tracking new object TODO
-        test = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        frameMean = int((cv2.meanStdDev(test))[0])
-        frameStdDev = int((cv2.meanStdDev(test))[1])
-        if frameStdDev < 10:
-            track_window, roi_hist = Calibrate_NewObject(cap)
+        resetCounter = resetCounter -1
+        if resetCounter == 0:
+            test = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            frameMean = int((cv2.meanStdDev(test))[0])
+            frameStdDev = int((cv2.meanStdDev(test))[1])
+            if frameStdDev < 10:
+                track_window, roi_hist = Calibrate_NewObject(cap)
+            resetCounter = 5
             
             
     else:
