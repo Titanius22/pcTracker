@@ -5,8 +5,6 @@ TODO
 -make function to tell servos to move 
 -make option to switch to face tracking
 
-
-
 """
 import numpy as np
 import cv2
@@ -16,14 +14,16 @@ import time
 resetCounter = 5
 
 # Resolution
-camWidth = 320
-camHeight = 240
+camWidth = 320 # Immediately redefined later
+camHeight = 240 # Immediately redefined later
 
 # Track box size
 trackWidth = 100
 trackHeight = 80
 
 # Hue detction range
+hueMin = 0
+hueMax = 180
 lower_hue = np.array([hueMin, 50, 50], dtype=np.uint8)
 upper_hue = np.array([hueMax,255,255], dtype=np.uint8)
 
@@ -42,13 +42,18 @@ def Calibrate_NewObject():
     # Give time for object to back away
     time.sleep(.4)
     
-    # take first frame of the video
-    ret,frame = cap.read()
+    # When the objects is moved away from the lense, the StdDev will increase.
+    # The image is only captured after the object is moved away
+    while(True):
+        # take first frame of the video
+        ret,frame = cap.read()
+        if(Get_Frame_StdDev(frame) > 30):
+            break
 
     # setup initial location of window
     r,h,c,w = int(.5*(camHeight-trackHeight)), trackHeight, int(.5*(camWidth-trackWidth)), trackWidth  # Defined above. used int() to keep type integer
     track_window = (c,r,w,h)
-
+    
     # set up the ROI for tracking
     roi = frame[r:r+h, c:c+w] #creat smaller frame
     hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV) #convert to HSV
@@ -58,12 +63,20 @@ def Calibrate_NewObject():
     cv2.normalize(roi_hist,roi_hist,0,255,cv2.NORM_MINMAX)
     
     return track_window, roi_hist
+        
+def Get_Frame_StdDev(chosenFrame):
+    test = cv2.cvtColor(chosenFrame, cv2.COLOR_BGR2GRAY)
+    return int((cv2.meanStdDev(test))[1])
 
 # created a camera object and connects to webcam
 cap = cv2.VideoCapture(0)
 
 # take first frame of the video
 ret,frame = cap.read()
+
+# Getting resolution
+camWidth = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+camHeight = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
 
 # setup initial location of window
 r,h,c,w = int(.5*(camHeight-trackHeight)), trackHeight, int(.5*(camWidth-trackWidth)), trackWidth  # Defined above. used int() to keep type integer
@@ -105,7 +118,6 @@ while(True):
         img2 = cv2.rectangle(frame, (x,y), (x+w,y+h), 255,2)
         #img2 = cv2.rectangle(frame, (48,48), (152,132), 255,2)
         #img2 = cv2.rectangle(frame, (48,48), (49,48), 255,0)
-        print "Its working " + str(x) + " " + str(ret) 
         
         cv2.imshow('img2',img2)
         
@@ -121,11 +133,11 @@ while(True):
             cv2.imwrite(chr(k)+".jpg",img2)
             
         # Used as a 'reset' button to start tracking new object TODO
+        
         resetCounter = resetCounter -1
         if resetCounter == 0:
-            test = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             #frameMean = int((cv2.meanStdDev(test))[0])
-            frameStdDev = int((cv2.meanStdDev(test))[1])
+            frameStdDev = Get_Frame_StdDev(frame)
             if frameStdDev < 10:
                 track_window, roi_hist = Calibrate_NewObject()
             resetCounter = 5     
