@@ -10,6 +10,7 @@ TODO
 """
 import numpy as np
 import cv2
+import time
 
 # How ofter will it check for 'reset'
 resetCounter = 5
@@ -23,8 +24,6 @@ trackWidth = 100
 trackHeight = 80
 
 # Hue detction range
-hueMin = 0
-hueMax = 180
 lower_hue = np.array([hueMin, 50, 50], dtype=np.uint8)
 upper_hue = np.array([hueMax,255,255], dtype=np.uint8)
 
@@ -39,12 +38,15 @@ Blue 100-135
 Purple 140-155
 Red 160-180
 """
-def Calibrate_NewObject(cap):
+def Calibrate_NewObject():
+    # Give time for object to back away
+    time.sleep(.4)
+    
     # take first frame of the video
     ret,frame = cap.read()
 
     # setup initial location of window
-    bottomLeftX, bottomLeftY = int(.5*(camHeight-trackHeight)), int(.5*(camWidth-trackWidth))  # Defined above. used int() to keep type integer
+    r,h,c,w = int(.5*(camHeight-trackHeight)), trackHeight, int(.5*(camWidth-trackWidth)), trackWidth  # Defined above. used int() to keep type integer
     track_window = (c,r,w,h)
 
     # set up the ROI for tracking
@@ -69,7 +71,6 @@ track_window = (c,r,w,h)
 
 # set up the ROI for tracking
 roi = frame[r:r+h, c:c+w] #creat smaller frame
-#roi = cv2.imread('C:/Users/Erik/Documents/13 Projects/RasPi/ball.jpg',0)
 hsv_roi =  cv2.cvtColor(roi, cv2.COLOR_BGR2HSV) #convert to HSV
 
 mask = cv2.inRange(hsv_roi, lower_hue, upper_hue) #np.array((0., 60.,32.)), np.array((180.,255.,255.))
@@ -85,7 +86,8 @@ term_crit = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 1)
 while(True):
     ret ,frame = cap.read()
 
-    if ret == True:
+    if True: #ret == True:
+        
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         dst = cv2.calcBackProject([hsv],[0],roi_hist,[0,180],1)
         
@@ -96,13 +98,14 @@ while(True):
         
         # The change  X and Y. posative isup and to the right
         deltaPos = cv2.subtract((track_window[0],track_window[1]), (preShift[0], preShift[1]))
-        print deltaPos
+        
   
         # Draw it on image
         x,y,w,h = track_window
         img2 = cv2.rectangle(frame, (x,y), (x+w,y+h), 255,2)
         #img2 = cv2.rectangle(frame, (48,48), (152,132), 255,2)
         #img2 = cv2.rectangle(frame, (48,48), (49,48), 255,0)
+        print "Its working " + str(x) + " " + str(ret) 
         
         cv2.imshow('img2',img2)
         
@@ -121,13 +124,11 @@ while(True):
         resetCounter = resetCounter -1
         if resetCounter == 0:
             test = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            frameMean = int((cv2.meanStdDev(test))[0])
+            #frameMean = int((cv2.meanStdDev(test))[0])
             frameStdDev = int((cv2.meanStdDev(test))[1])
             if frameStdDev < 10:
-                track_window, roi_hist = Calibrate_NewObject(cap)
-            resetCounter = 5
-            
-            
+                track_window, roi_hist = Calibrate_NewObject()
+            resetCounter = 5     
     else:
         break
 
